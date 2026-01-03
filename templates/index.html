@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マルチカメラ品質管理システム</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Hiragino Kaku Gothic ProN', 'メイリオ', Meiryo, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #da190b;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #2196F3;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #0b7dda;
+            transform: translateY(-2px);
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        input, select {
+            padding: 8px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #2196F3;
+        }
+
+        /* Line Stop Alert */
+        .line-stop-alert {
+            display: none;
+            background: #ff1744;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 16px rgba(255, 23, 68, 0.4);
+            animation: pulse 2s infinite;
+        }
+
+        .line-stop-alert.active {
+            display: block;
+        }
+
+        @keyframes pulse {
+            0%, 100% { 
+                opacity: 1; 
+                transform: scale(1);
+            }
+            50% { 
+                opacity: 0.85;
+                transform: scale(1.01);
+            }
+        }
+
+        .line-stop-alert h2 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .alert-icon {
+            font-size: 32px;
+            animation: shake 0.5s infinite;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0) rotate(0deg); }
+            25% { transform: translateX(-5px) rotate(-5deg); }
+            75% { transform: translateX(5px) rotate(5deg); }
+        }
+
+        .stopped-cameras {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 5px;
+        }
+
+        /* Main Grid */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        /* Camera Grid */
+        .cameras-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .camera-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .cameras-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 15px;
+        }
+
+        .camera-card {
+            border: 3px solid #ddd;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #f9f9f9;
+            transition: transform 0.2s;
+        }
+
+        .camera-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        }
+
+        .camera-card.product {
+            border-color: #2196F3;
+        }
+
+        .camera-card.package {
+            border-color: #FF9800;
+        }
+
+        .camera-header {
+            padding: 10px;
+            font-weight: bold;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .camera-card.product .camera-header {
+            background: #2196F3;
+        }
+
+        .camera-card.package .camera-header {
+            background: #FF9800;
+        }
+
+        .camera-feed {
+            width: 100%;
+            height: 240px;
+            background: #000;
+            object-fit: contain;
+            display: block;
+        }
+
+        .camera-info {
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .camera-status {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .btn-small {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        /* Right Panel */
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .stats-section, .pairs-section, .logs-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        h2 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 18px;
+            border-bottom: 2px solid #2196F3;
+            padding-bottom: 8px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+
+        .stat-item {
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            transition: transform 0.2s;
+        }
+
+        .stat-item:hover {
+            transform: scale(1.05);
+        }
+
+        .stat-total {
+            background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 100%);
+            color: #1976D2;
+        }
+
+        .stat-passed {
+            background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%);
+            color: #388E3C;
+        }
+
+        .stat-failed {
+            background: linear-gradient(135deg, #FFEBEE 0%, #FFCDD2 100%);
+            color: #D32F2F;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        .pairs-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .pairs-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .pairs-list::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        .pairs-list::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        .pair-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: #f5f5f5;
+            margin-bottom: 5px;
+            border-radius: 5px;
+            transition: background 0.2s;
+        }
+
+        .pair-item:hover {
+            background: #e0e0e0;
+        }
+
+        .pair-arrow {
+            color: #666;
+            margin: 0 10px;
+            font-weight: bold;
+        }
+
+        .logs-section {
+            flex-grow: 1;
+        }
+
+        .logs-list {
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 13px;
+        }
+
+        .logs-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .logs-list::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        .logs-list::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        .log-item {
+            padding: 10px;
+            margin-bottom: 5px;
+            border-radius: 5px;
+            border-left: 4px solid #ddd;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .log-item.pass {
+            background: #E8F5E9;
+            border-left-color: #4CAF50;
+        }
+
+        .log-item.fail {
+            background: #FFEBEE;
+            border-left-color: #f44336;
+        }
+
+        .timestamp {
+            color: #666;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+            font-size: 14px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .status-active {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .status-inactive {
+            background: #999;
+            color: white;
+        }
+
+        @media (max-width: 1200px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .cameras-grid {
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            }
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎥 マルチカメラ品質管理システム</h1>
+            <div class="header-controls">
+                <div class="input-group">
+                    <input type="text" id="modelPath" placeholder="モデルパス (例: yolov8n.pt)" style="width: 280px;">
+                    <button class="btn btn-secondary" onclick="loadModel()">モデル読込</button>
+                    <span id="modelStatus" style="color: #999;">モデル未読込</span>
+                </div>
+                
+                <div class="input-group">
+                    <label>ライン停止閾値 (秒):</label>
+                    <input type="number" id="lineStopThreshold" value="5" min="1" max="60" style="width: 80px;" onchange="updateThreshold()">
+                </div>
+                
+                <button class="btn btn-primary" id="startBtn" onclick="toggleSystem()">システム開始</button>
+            </div>
+        </header>
+
+        <!-- Line Stop Alert -->
+        <div class="line-stop-alert" id="lineStopAlert">
+            <h2>
+                <span class="alert-icon">⚠️</span>
+                生産ライン停止！
+            </h2>
+            <p>以下のカメラで検出活動がありません：</p>
+            <div class="stopped-cameras" id="stoppedCameras"></div>
+        </div>
+
+        <div class="main-grid">
+            <!-- Cameras Section -->
+            <div class="cameras-section">
+                <h2>📹 カメラフィード</h2>
+                <div class="camera-controls">
+                    <select id="newCameraIndex">
+                        <option value="0">カメラ 0</option>
+                        <option value="1">カメラ 1</option>
+                        <option value="2">カメラ 2</option>
+                        <option value="3">カメラ 3</option>
+                        <option value="4">カメラ 4</option>
+                        <option value="5">カメラ 5</option>
+                    </select>
+                    <select id="cameraRole">
+                        <option value="product">製品検出</option>
+                        <option value="package">パッケージ検出</option>
+                    </select>
+                    <button class="btn btn-secondary" onclick="addCamera()">カメラ追加</button>
+                </div>
+                <div class="cameras-grid" id="camerasGrid">
+                    <div class="empty-state">
+                        カメラが追加されていません。<br>カメラを追加して開始してください。
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel -->
+            <div class="right-panel">
+                <!-- Statistics -->
+                <div class="stats-section">
+                    <h2>📊 統計情報</h2>
+                    <div class="stats-grid">
+                        <div class="stat-item stat-total">
+                            <span class="stat-value" id="statTotal">0</span>
+                            <span class="stat-label">検査総数</span>
+                        </div>
+                        <div class="stat-item stat-passed">
+                            <span class="stat-value" id="statPassed">0 (0%)</span>
+                            <span class="stat-label">合格</span>
+                        </div>
+                        <div class="stat-item stat-failed">
+                            <span class="stat-value" id="statFailed">0 (0%)</span>
+                            <span class="stat-label">不合格</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-secondary" style="width: 100%; margin-top: 10px;" onclick="resetStats()">統計リセット</button>
+                </div>
+
+                <!-- Pairs -->
+                <div class="pairs-section">
+                    <h2>🔗 製品-パッケージペア</h2>
+                    <div class="input-group" style="margin-bottom: 10px; flex-wrap: wrap;">
+                        <input type="text" id="productInput" placeholder="製品名" list="productClasses" style="flex: 1; min-width: 120px;">
+                        <input type="text" id="packageInput" placeholder="パッケージ名" list="packageClasses" style="flex: 1; min-width: 120px;">
+                        <button class="btn btn-secondary btn-small" onclick="addPair()">追加</button>
+                    </div>
+                    <datalist id="productClasses"></datalist>
+                    <datalist id="packageClasses"></datalist>
+                    <div class="pairs-list" id="pairsList">
+                        <div class="empty-state" style="padding: 20px;">ペアが登録されていません</div>
+                    </div>
+                </div>
+
+                <!-- Logs -->
+                <div class="logs-section">
+                    <h2>📝 検査ログ</h2>
+                    <div class="logs-list" id="logsList">
+                        <div class="empty-state" style="padding: 20px;">ログがありません</div>
+                    </div>
+                    <button class="btn btn-secondary" style="width: 100%; margin-top: 10px;" onclick="clearLogs()">ログクリア</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let isSystemRunning = false;
+
+        // Socket events
+        socket.on('connect', () => {
+            console.log('Connected to server');
+        });
+
+        socket.on('detection', (data) => {
+            console.log('検出:', data);
+        });
+
+        socket.on('log_update', (log) => {
+            addLogToUI(log);
+        });
+
+        socket.on('stats_update', (stats) => {
+            updateStatsUI(stats);
+        });
+
+        socket.on('line_stop_alert', (data) => {
+            showLineStopAlert(data);
+        });
+
+        // Load model
+        async function loadModel() {
+            const modelPath = document.getElementById('modelPath').value.trim();
+            if (!modelPath) {
+                alert('モデルパスを入力してください');
+                return;
+            }
+
+            const response = await fetch('/api/load_model', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({model_path: modelPath})
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                document.getElementById('modelStatus').textContent = `モデル: ${data.model_name}`;
+                document.getElementById('modelStatus').style.color = 'green';
+                
+                // Update dropdowns with classes
+                if (data.classes && data.classes.length > 0) {
+                    const productDatalist = document.getElementById('productClasses');
+                    const packageDatalist = document.getElementById('packageClasses');
+                    
+                    productDatalist.innerHTML = '';
+                    packageDatalist.innerHTML = '';
+                    
+                    data.classes.forEach(cls => {
+                        const option1 = document.createElement('option');
+                        option1.value = cls;
+                        productDatalist.appendChild(option1);
+                        
+                        const option2 = document.createElement('option');
+                        option2.value = cls;
+                        packageDatalist.appendChild(option2);
+                    });
+                }
+            } else {
+                alert('エラー: ' + data.error);
+                document.getElementById('modelStatus').textContent = 'エラー: ' + data.error;
+                document.getElementById('modelStatus').style.color = 'red';
+            }
+        }
+
+        // Add camera
+        async function addCamera() {
+            const cameraIndex = parseInt(document.getElementById('newCameraIndex').value);
+            const role = document.getElementById('cameraRole').value;
+
+            const response = await fetch('/api/add_camera', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({camera_index: cameraIndex, role: role})
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                await loadCameras();
+            } else {
+                alert('エラー: ' + data.error);
+            }
+        }
+
+        // Remove camera
+        async function removeCamera(cameraId) {
+            if (!confirm('このカメラを削除しますか？')) {
+                return;
+            }
+
+            const response = await fetch(`/api/remove_camera/${cameraId}`, {
+                method: 'DELETE'
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                await loadCameras();
+            }
+        }
+
+        // Load cameras
+        async function loadCameras() {
+            const response = await fetch('/api/get_cameras');
+            const data = await response.json();
+            
+            const grid = document.getElementById('camerasGrid');
+            grid.innerHTML = '';
+
+            if (data.cameras.length === 0) {
+                grid.innerHTML = '<div class="empty-state">カメラが追加されていません。</div>';
+                return;
+            }
+
+            data.cameras.forEach(cam => {
+                const roleText = cam.role === 'product' ? '製品' : 'パッケージ';
+                const card = document.createElement('div');
+                card.className = `camera-card ${cam.role}`;
+                card.innerHTML = `
+                    <div class="camera-header">
+                        <span>カメラ ${cam.index} - ${roleText}検出</span>
+                        <span class="status-badge status-active">稼働中</span>
+                    </div>
+                    <img class="camera-feed" src="/api/video_feed/${cam.id}?t=${Date.now()}" alt="カメラ ${cam.id}">
+                    <div class="camera-info">
+                        <span class="camera-status" id="status-${cam.id}">アクティブ</span>
+                        <button class="btn btn-danger btn-small" onclick="removeCamera('${cam.id}')">削除</button>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // Toggle system
+        async function toggleSystem() {
+            const btn = document.getElementById('startBtn');
+            
+            if (!isSystemRunning) {
+                const response = await fetch('/api/start', {method: 'POST'});
+                const data = await response.json();
+                
+                if (data.success) {
+                    isSystemRunning = true;
+                    btn.textContent = 'システム停止';
+                    btn.className = 'btn btn-danger';
+                } else {
+                    alert('エラー: ' + data.error);
+                }
+            } else {
+                const response = await fetch('/api/stop', {method: 'POST'});
+                const data = await response.json();
+                
+                if (data.success) {
+                    isSystemRunning = false;
+                    btn.textContent = 'システム開始';
+                    btn.className = 'btn btn-primary';
+                }
+            }
+        }
+
+        // Add pair
+        async function addPair() {
+            const product = document.getElementById('productInput').value.trim();
+            const package = document.getElementById('packageInput').value.trim();
+
+            if (!product || !package) {
+                alert('製品名とパッケージ名を両方入力してください');
+                return;
+            }
+
+            const response = await fetch('/api/add_pair', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({product, package})
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                await loadPairs();
+                document.getElementById('productInput').value = '';
+                document.getElementById('packageInput').value = '';
+            } else {
+                alert('エラー: ' + data.error);
+            }
+        }
+
+        // Remove pair
+        async function removePair(product) {
+            if (!confirm('このペアを削除しますか？')) {
+                return;
+            }
+
+            const response = await fetch(`/api/remove_pair/${encodeURIComponent(product)}`, {
+                method: 'DELETE'
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                await loadPairs();
+            }
+        }
+
+        // Load pairs
+        async function loadPairs() {
+            const response = await fetch('/api/get_pairs');
+            const data = await response.json();
+            
+            const list = document.getElementById('pairsList');
+            list.innerHTML = '';
+
+            if (Object.keys(data.pairs).length === 0) {
+                list.innerHTML = '<div class="empty-state" style="padding: 20px;">ペアが登録されていません</div>';
+                return;
+            }
+
+            Object.entries(data.pairs).forEach(([product, package]) => {
+                const item = document.createElement('div');
+                item.className = 'pair-item';
+                item.innerHTML = `
+                    <span><strong>${product}</strong> <span class="pair-arrow">→</span> <strong>${package}</strong></span>
+                    <button class="btn btn-danger btn-small" onclick="removePair('${product}')">✕</button>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        // Add log to UI
+        function addLogToUI(log) {
+            const list = document.getElementById('logsList');
+            
+            // Remove empty state
+            if (list.querySelector('.empty-state')) {
+                list.innerHTML = '';
+            }
+            
+            const item = document.createElement('div');
+            item.className = `log-item ${log.type}`;
+            item.innerHTML = `
+                <span class="timestamp">[${log.timestamp}]</span>
+                <div style="margin-top: 4px;">${log.message}</div>
+            `;
+            list.insertBefore(item, list.firstChild);
+
+            // Keep only last 100
+            while (list.children.length > 100) {
+                list.removeChild(list.lastChild);
+            }
+        }
+
+        // Update stats UI
+        function updateStatsUI(stats) {
+            document.getElementById('statTotal').textContent = stats.total;
+            
+            const passPct = stats.total > 0 ? ((stats.passed / stats.total) * 100).toFixed(1) : 0;
+            document.getElementById('statPassed').textContent = `${stats.passed} (${passPct}%)`;
+            
+            const failPct = stats.total > 0 ? ((stats.failed / stats.total) * 100).toFixed(1) : 0;
+            document.getElementById('statFailed').textContent = `${stats.failed} (${failPct}%)`;
+        }
+
+        // Show line stop alert
+        function showLineStopAlert(data) {
+            const alert = document.getElementById('lineStopAlert');
+            
+            if (data.stopped) {
+                alert.classList.add('active');
+                const camerasList = document.getElementById('stoppedCameras');
+                const roleText = (role) => role === 'product' ? '製品' : 'パッケージ';
+                camerasList.innerHTML = data.cameras.map(cam => 
+                    `<div>📹 ${cam.id} (${roleText(cam.role)}) - ${cam.seconds}秒間活動なし</div>`
+                ).join('');
+            } else {
+                alert.classList.remove('active');
+            }
+        }
+
+        // Reset stats
+        async function resetStats() {
+            if (confirm('すべての統計をリセットしますか？')) {
+                await fetch('/api/reset_stats', {method: 'POST'});
+                updateStatsUI({total: 0, passed: 0, failed: 0});
+                document.getElementById('logsList').innerHTML = '<div class="empty-state" style="padding: 20px;">ログがありません</div>';
+            }
+        }
+
+        // Clear logs
+        function clearLogs() {
+            if (confirm('すべてのログをクリアしますか？')) {
+                document.getElementById('logsList').innerHTML = '<div class="empty-state" style="padding: 20px;">ログがありません</div>';
+            }
+        }
+
+        // Update threshold
+        async function updateThreshold() {
+            const threshold = document.getElementById('lineStopThreshold').value;
+            await fetch('/api/set_line_stop_threshold', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({threshold: parseInt(threshold)})
+            });
+        }
+
+        // Load initial data
+        window.addEventListener('load', () => {
+            loadPairs();
+            loadCameras();
+        });
+
+        // Refresh cameras periodically
+        setInterval(() => {
+            if (!document.hidden) {
+                loadCameras();
+            }
+        }, 5000);
+    </script>
+</body>
+  </html>
