@@ -27,8 +27,8 @@ YOLOを使用した製品とパッケージの自動品質管理システムで�
 
 ```bash
 # リポジトリをクローン
-git clone https://github.com/yourusername/quality-control-system.git
-cd quality-control-system
+git clone https://github.com/Rikiza89/Multi_camera_quality_control.git
+cd Multi_camera_quality_control
 
 # 必要なパッケージをインストール
 pip install -r requirements.txt
@@ -36,13 +36,13 @@ pip install -r requirements.txt
 
 **requirements.txt:**
 ```
-Flask==3.0.0
-Flask-SocketIO==5.3.5
-opencv-python==4.8.1.78
-numpy==1.24.3
-ultralytics==8.0.200
-python-socketio==5.10.0
-eventlet==0.33.3
+Flask
+Flask-SocketIO
+opencv-python
+numpy
+ultralytics
+python-socketio
+eventlet
 ```
 
 ### 3. プロジェクト構造
@@ -207,18 +207,14 @@ socketio.run(app, debug=True, host='0.0.0.0', port=8080)  # ポート変更
 
 ## 📄 ライセンス
 
-MIT License
+GNU Affero General Public License v3.0 (AGPL-3.0) License
 
 ## 🤝 貢献
 
 プルリクエスト歓迎！バグ報告や機能提案はIssueでお願いします。
 
-## 📞 サポート
-
-問題がある場合は[Issue](https://github.com/yourusername/quality-control-system/issues)を作成してください。
-
 ---
 
-**開発者**: Your Name  
+**開発者**: Rikiza89
 **バージョン**: 1.0.0  
 **最終更新**: 2026年1月
